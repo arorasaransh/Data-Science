@@ -622,110 +622,573 @@ from sklearn.preprocessing import OneHotEncoder
 enc = OneHotEncoder(handle_unknown='ignore')
 
 
+# In[80]:
+
+
+Item_MRP_OHE = pd.get_dummies(pd.Series(list(df['Item_MRP_bucket'])), drop_first=True)
+
+
+# In[81]:
+
+
+Item_Type_OHE_1 = pd.get_dummies(pd.Series(list(df['Item_Type_1'])),drop_first=True)
+
+
+# In[82]:
+
+
+Item_Fat_OHE = pd.get_dummies(pd.Series(list(df['Item_Fat_Content'])),drop_first=True)
+
+
+# In[83]:
+
+
+Item_Type_OHE = pd.get_dummies(pd.Series(list(df['Item_Type'])),drop_first=True)
+
+
+# In[84]:
+
+
+Outlet_Type_OHE = pd.get_dummies(pd.Series(list(df['Outlet_Type'])),drop_first=True)
+
+
+# In[85]:
+
+
+Outlet_Identifier_OHE = pd.get_dummies(pd.Series(list(df['Outlet_Identifier'])),drop_first=True)
+
+
+# In[86]:
+
+
+df_new = df[['Item_MRP','Item_Outlet_Sales','Item_Visibility','Item_Weight','Established_Years','Outlet_Size_Category','Outlet_Location_Category','Item_MRP_weight']]
+
+
+# In[87]:
+
+
+Item_MRP_OHE.rename(columns={"Fourth": "Item_MRP_Fourth", "Second": "Item_MRP_Second", "Third": "Item_MRP_Third"},inplace=True)
+
+
+# In[88]:
+
+
+Item_Fat_OHE.rename(columns={"Regular": "Fat_Content_Regular"},inplace=True)
+
+
+# ### Data Preprocess - Removing Skewness and Scaling
+
+# In[89]:
+
+
+df['Item_MRP_weight']
+
+
+# In[90]:
+
+
+df.head(2)
+
+
+# In[91]:
+
+
+#Removing Skewness in Visibility and Item_MRP_weight by taking log
+df['Item_Visibility'] = np.log(df['Item_Visibility']+1)
+df['Item_MRP_weight'] = np.log(df['Item_MRP_weight']+1)
+
+
+# In[92]:
+
+
+df.head(2)
+
+
+# In[93]:
+
+
+from sklearn.preprocessing import StandardScaler
+
+scaler = StandardScaler()
+Visibility_array = np.array(df['Item_Visibility'])
+Visibility_array = Visibility_array.reshape(-1,1)
+Visibility_scaled = scaler.fit_transform(Visibility_array)
+Visibility_scaled = Visibility_scaled.reshape(-1).tolist()
+df['Item_Visibility'] = Visibility_scaled
+
+
+# In[94]:
+
+
+scaler = StandardScaler()
+Item_MRP_weight_array = np.array(df['Item_MRP_weight']).reshape(-1,1)
+Item_MRP_weight_scaled = scaler.fit_transform(Item_MRP_weight_array)
+Item_MRP_weight_scaled = Item_MRP_weight_scaled.reshape(-1).tolist()
+df['Item_MRP_weight'] = Item_MRP_weight_scaled
+
+
+# In[95]:
+
+
+scaler = StandardScaler()
+Item_outletsales_array = np.array(df['Item_Outlet_Sales']).reshape(-1,1)
+Item_outletsales_scaled = scaler.fit_transform(Item_outletsales_array)
+Item_outletsales_scaled = Item_outletsales_scaled.reshape(-1).tolist()
+#df['Item_MRP_weight'] = Item_outletsales_scaled
+
+
+# In[96]:
+
+
+df.head(1)
+
+
+# In[97]:
+
+
+df_final = df[['Item_Identifier','Outlet_Identifier','Item_Visibility','Item_Outlet_Sales','Item_MRP_weight','Established_Years','Outlet_Size_Category','Outlet_Location_Category']]
+
+
+# In[98]:
+
+
+df_final.reset_index(drop=True, inplace=True)
+
+
+# In[99]:
+
+
+df_final.head(1)
+
+
+# In[100]:
+
+
+df_a = (((Item_MRP_OHE.join(Item_Type_OHE_1)).join(Item_Fat_OHE)).join(Outlet_Type_OHE)).join(Outlet_Identifier_OHE)
+
+
+# In[101]:
+
+
+df_finally = df_final.join(df_a)
+
+
+# In[110]:
+
+
+df_finally
+
+
+# In[103]:
+
+
+train_index = df_finally[df_finally['Item_Outlet_Sales'].isnull()].index.tolist()
+
+
+# In[104]:
+
+
+df_train = df_finally.drop(train_index)
+
+
+# In[105]:
+
+
+df_train.info()
+
+
+# In[106]:
+
+
+test_index = df_finally[df_finally['Item_Outlet_Sales'].notnull()].index.tolist()
+
+
+# In[107]:
+
+
+df_test = df_finally.drop(test_index)
+
+
+# In[108]:
+
+
+df_test.reset_index(drop=True, inplace= True)
+
+
+# In[109]:
+
+
+corr = df_train.corr()
+corr.style.background_gradient(cmap='coolwarm')
+
+
+# ##### Strong correlation of Item_Outlet_Sales with other variables:
+# Item_MRP_weight, Item_MRP_Fourth, Type3, OUT019 and OUT027
+
+# ##### We will build the following models in the next sections.
+# 
+# Linear Regression, 
+# Lasso Regression, 
+# Ridge Regression, 
+# RandomForest, 
+# XGBoost
+
+# 1. Using Linear Regression with k-fold cross validation
+
+# In[111]:
+
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn import metrics
+
+
+# In[112]:
+
+
+df_train.columns
+
+
+# In[113]:
+
+
+X_train = df_train.loc[:, df_train.columns != 'Item_Outlet_Sales']
+Y_train = df_train.loc[:, df_train.columns == 'Item_Outlet_Sales']
+X_test = df_test.loc[:,df_test.columns!='Item_Outlet_Sales']
+
+
+# In[114]:
+
+
+X_train.head(2)
+
+
+# In[115]:
+
+
+del X_train['Item_Identifier']
+
+
+# In[116]:
+
+
+del X_train['Outlet_Identifier']
+
+
+# In[117]:
+
+
+regressor = LinearRegression()
+
+
+# In[118]:
+
+
+model_regressor = regressor.fit(X_train, Y_train)
+
+
+# In[119]:
+
+
+regressor.intercept_
+
+
+# In[120]:
+
+
+regressor.coef_
+
+
+# In[121]:
+
+
+X_test_2 = X_test[['Item_Identifier','Outlet_Identifier']]
+
+
+# In[122]:
+
+
+del X_test['Item_Identifier']
+
+
+# In[123]:
+
+
+del X_test['Outlet_Identifier']
+
+
+# In[124]:
+
+
+Y_pred = regressor.predict(X_test)
+
+
+# In[125]:
+
+
+Y_pred_2 = pd.DataFrame(Y_pred.reshape(-1).tolist())
+
+
+# In[126]:
+
+
+X_test_2 = X_test_2.join(Y_pred_2)
+
+
+# In[127]:
+
+
+X_test_2.rename(columns = {0:'Item_Outlet_Sales'},inplace=True)
+
+
+# In[128]:
+
+
+X_test_2
+
+
+# In[129]:
+
+
+from pandas import ExcelWriter
+
+
+# In[303]:
+
+
+writer = ExcelWriter('Results.xlsx')
+X_test_2.to_excel(writer,index=False)
+writer.save()
+
+
 # In[ ]:
 
 
+#Submitted the solution to the competition website and got the RMSE: 1424.8637599265
 
+
+# ##### Using k-fold Cross validation
+
+# In[130]:
+
+
+from sklearn.model_selection import KFold
+
+
+# In[131]:
+
+
+kfold = KFold(n_splits=5)
+
+
+# In[132]:
+
+
+df_kfold = df_train.copy(deep=True)
+
+
+# In[133]:
+
+
+target_df_kfold = pd.DataFrame(df_kfold['Item_Outlet_Sales'])
+
+
+# In[134]:
+
+
+del df_kfold['Item_Identifier']
+del df_kfold['Outlet_Identifier']
+del df_kfold['Item_Outlet_Sales']
+
+
+# In[135]:
+
+
+def get_score(model, x_train, x_test, y_train, y_test):
+    model.fit(k_x_train, k_y_train)
+    return model.score(k_x_test, k_y_test)
+
+
+# In[136]:
+
+
+kfold_scores = []
+for kfold_train_index, kfold_test_index in kfold.split(df_kfold):
+    print(kfold_train_index)
+    print(kfold_test_index)
+    #k_x_train, k_x_test, k_y_train, k_y_test = df_kfold[kfold_train_index], df_kfold[kfold_test_index], target_df_kfold[kfold_train_index], target_df_kfold[kfold_test_index]
+    #kfold_scores.append(get_score(LinearRegression(), k_x_train, k_x_test, k_y_train, k_y_test))
+    
+    
+
+
+# ##### Regularized Regression Models
+
+# ###### Ridge Regularization
+
+# In[137]:
+
+
+from sklearn.linear_model import Ridge
+ridge = Ridge(alpha=0.5, normalize=True)
+
+ridge.fit(X_train, Y_train)
+ridge_predict = ridge.predict(X_test)
+
+
+# In[138]:
+
+
+ridge_predict
+
+
+# In[139]:
+
+
+ridge_predict = pd.DataFrame(ridge_predict.reshape(-1).tolist())
+
+
+# In[140]:
+
+
+try: 
+    del X_test_2['Item_Outlet_Sales']
+except:
+    pass
+
+
+# In[141]:
+
+
+X_test_2 = X_test_2.join(ridge_predict)
+
+
+# In[142]:
+
+
+X_test_2.rename(columns = {0:'Item_Outlet_Sales'},inplace=True)
+
+
+# In[143]:
+
+
+writer = ExcelWriter('Ridge_Results.xlsx')
+X_test_2.to_excel(writer,index=False)
+writer.save()
 
 
 # In[ ]:
 
 
+#Submitted the solution to the competition website and got the RMSE:1285.605
 
 
+# ###### Using Lasso Regularization
 
-# In[ ]:
+# In[144]:
 
 
+from sklearn.linear_model import Lasso
+lasso = Lasso(alpha=0.05, normalize=True)
 
+lasso.fit(X_train, Y_train)
+lasso_predict = lasso.predict(X_test)
 
 
-# In[ ]:
+# In[145]:
 
 
+lasso_predict = pd.DataFrame(lasso_predict.reshape(-1).tolist())
 
 
+# In[146]:
 
-# In[ ]:
 
+try: 
+    del X_test_2['Item_Outlet_Sales']
+except:
+    pass
 
 
+# In[147]:
 
 
-# In[ ]:
+X_test_2 = X_test_2.join(lasso_predict)
 
 
+# In[148]:
 
 
+X_test_2.rename(columns = {0:'Item_Outlet_Sales'},inplace=True)
 
-# In[ ]:
 
+# In[149]:
 
 
+writer = ExcelWriter('Lasso_Results.xlsx')
+X_test_2.to_excel(writer,index=False)
+writer.save()
 
 
-# In[ ]:
+# In[386]:
 
 
+#Submitted the solution to the competition website and got the RMSE: 1219.6827
 
 
+# ###### Using Random Forest
 
-# In[ ]:
+# In[152]:
 
 
+from sklearn.ensemble import RandomForestRegressor
 
 
+# In[172]:
 
-# In[ ]:
 
+rf_model = RandomForestRegressor(n_estimators=350, bootstrap=True)
+rf_model.fit(X_train, Y_train)
+rf_predict = rf_model.predict(X_test)
 
 
+# In[173]:
 
 
-# In[ ]:
+rf_predict = pd.DataFrame(rf_predict.reshape(-1).tolist())
 
 
+# In[174]:
 
 
+try: 
+    del X_test_2['Item_Outlet_Sales']
+except:
+    pass
 
-# In[ ]:
 
+# In[175]:
 
 
+X_test_2 = X_test_2.join(rf_predict)
 
 
-# In[ ]:
+# In[176]:
 
 
+X_test_2.rename(columns = {0:'Item_Outlet_Sales'},inplace=True)
 
 
+# In[177]:
 
-# In[ ]:
 
+writer = ExcelWriter('Random_Forest_Results.xlsx')
+X_test_2.to_excel(writer,index=False)
+writer.save()
 
 
+# In[178]:
 
 
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
+#Submitted the solution to the competition website and got the RMSE: 1241.7697
 
